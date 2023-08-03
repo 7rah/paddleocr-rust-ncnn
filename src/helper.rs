@@ -2,6 +2,18 @@ use anyhow::{Context, Result};
 use image::{self, DynamicImage, GenericImageView, ImageBuffer, Luma};
 use ncnn_rs::{Mat, Net};
 
+// 写一个宏统计时间，用大括号 {} 包围调试的语句，打印出语句执行的时间和行号
+#[macro_use]
+macro_rules! timeit {
+    ($($arg:tt)*) => {{
+        let start = std::time::Instant::now();
+        let res = { $($arg)* };
+        let end = std::time::Instant::now();
+        println!("{}:{}: {}ms", file!(), line!(), (end - start).as_millis());
+        res
+    }}
+}
+
 pub trait ImageToMat {
     fn to_normalized_mat(&self) -> Result<Mat>;
 }
@@ -34,10 +46,7 @@ impl MatToGrayImg for Mat {
         let img: ImageBuffer<Luma<u8>, Vec<u8>> = image::ImageBuffer::from_vec(
             self.w() as u32,
             self.h() as u32,
-            data.into_iter()
-                .map(|x| (x * 255.0) as u8)
-                .into_iter()
-                .collect(),
+            data.iter().map(|x| (x * 255.0) as u8).collect(),
         )
         .with_context(|| "buffer is not big enough")?;
 
@@ -88,22 +97,6 @@ impl Network {
 
         net.load_param(param)?;
         net.load_model(bin)?;
-
-        Ok(Self {
-            net,
-            input: "".to_string(),
-            output: "".to_string(),
-        })
-    }
-    pub fn load_from_memory(param: &[u8], bin: &[u8], enable_vulkan: bool) -> Result<Self> {
-        let mut net = Net::new();
-
-        let mut opt = ncnn_rs::Option::new();
-        opt.set_vulkan_compute(enable_vulkan);
-        net.set_option(&opt);
-
-        //net.load_param_memory(param)?;
-        //net.load_model_memory(bin)?;
 
         Ok(Self {
             net,

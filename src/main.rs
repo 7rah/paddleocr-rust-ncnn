@@ -1,4 +1,6 @@
 mod det;
+
+#[macro_use]
 mod helper;
 mod rect;
 use anyhow::Result;
@@ -9,8 +11,11 @@ fn main() -> Result<()> {
     let mut det = det::Detector::init()?;
     let img = image::open("inputs/a.png")?;
 
-    let res = det.infer(img)?.to_gray_img()?;
-    res.save("outputs/a-det.png")?;
+    let (boxes, imgs, scores) = det.infer(img)?;
+
+    for (i, (img, score)) in imgs.iter().zip(scores).enumerate() {
+        img.save(format!("outputs/a-det-clip/{i}-{score:.2}.png"))?;
+    }
 
     Ok(())
 }
