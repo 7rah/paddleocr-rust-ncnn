@@ -1,8 +1,8 @@
 use crate::helper::*;
 use crate::rect::{Rotate, Rotation};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use derivative::Derivative;
-use image::{imageops, DynamicImage, GrayImage, Luma, Pixel, RgbImage};
+use image::{imageops, DynamicImage, GenericImage, GrayImage, Luma, Pixel, Rgb, RgbImage};
 use imageproc::drawing::Canvas;
 use imageproc::geometry::min_area_rect;
 use imageproc::{
@@ -46,13 +46,15 @@ impl Detector {
 
     pub fn infer(
         &mut self,
-        img: DynamicImage,
+        img: &DynamicImage,
     ) -> Result<(Vec<[Point<f64>; 4]>, Vec<DynamicImage>, Vec<f64>)> {
         let config = DetectorConfig::default();
+        let img = adjust_img(img)?;
 
         // infer
         let mat_in = img.to_normalized_mat()?;
         let mat_out = self.net.infer(&mat_in)?;
+        mat_out.to_gray_img().unwrap().save("outputs/c-det.png").unwrap();
 
         let (boxes, scores) = get_boxes_and_scores(&mat_out, config.box_threshold)?;
 
@@ -61,7 +63,11 @@ impl Detector {
 
         for rect in boxes.iter() {
             // expand box
-            let distance = get_contour_area(rect, config.unclip_ratio);
+            let (distance,area,dis) = get_contour_area(rect, config.unclip_ratio);
+            if (area < 5.0) | (dis < 20.0) {
+                continue;
+            }
+
             let rect = expand_box(rect, distance);
 
             // clip image
@@ -75,10 +81,64 @@ impl Detector {
     }
 }
 
-fn get_contour_area(box_points: &[Point<f64>], unclip_ratio: f64) -> f64 {
+fn adjust_img(img: &DynamicImage) -> Result<DynamicImage> {
+    let background_pixel = calc_edge_avg_pixel(&img);
+    // 扩张图片，调整成 32 的倍数
+    let original_width = img.width();
+    let original_height = img.height();
+    let new_width = ((original_width + 31) / 32) * 32;
+    let new_height = ((original_height + 31) / 32) * 32;
+    // 创建一个新的图像缓冲区
+    let mut output_img: RgbImage = RgbImage::from_pixel(new_width, new_height, background_pixel);
+
+    // 将原始图像复制到新图像
+    output_img.copy_from(&img.to_rgb8(), 0, 0)?;
+    Ok(DynamicImage::ImageRgb8(output_img))
+}
+
+// 计算边上像素点的平均值
+fn calc_edge_avg_pixel(img: &DynamicImage) -> Rgb<u8> {
+    // 计算长宽
+    let (width, height) = img.dimensions();
+
+    // 计算四条边上的像素点的坐标
+    let top = (0..width).map(|x| (x, 0));
+    let bottom = (0..width).map(|x| (x, height - 1));
+    let left = (1..height - 1).map(|y| (0, y));
+    let right = (1..height - 1).map(|y| (width - 1, y));
+
+    // 把四个边上的点合并
+    let points = top
+        .chain(bottom)
+        .chain(left)
+        .chain(right)
+        .map(|(x, y)| img.get_pixel(x, y).to_rgb());
+
+    let cnt = (width + height) * 2 - 4;
+
+    // 计算平均值
+    let sum = points.fold((0, 0, 0), |acc, pixel| {
+        (
+            acc.0 + pixel[0] as u32,
+            acc.1 + pixel[1] as u32,
+            acc.2 + pixel[2] as u32,
+        )
+    });
+
+    Rgb([
+        (sum.0 / cnt) as u8,
+        (sum.1 / cnt) as u8,
+        (sum.2 / cnt) as u8,
+    ])
+}
+
+/// return (expand_distance,area,dist)
+fn get_contour_area(box_points: &[Point<f64>], unclip_ratio: f64) -> (f64,f64,f64) {
     let pts_num = 4;
     let mut area = 0.0;
     let mut dist = 0.0;
+
+
 
     for i in 0..pts_num {
         let next_i = (i + 1) % pts_num;
@@ -92,7 +152,7 @@ fn get_contour_area(box_points: &[Point<f64>], unclip_ratio: f64) -> f64 {
 
     area = f64::abs(area / 2.0);
 
-    area * unclip_ratio / dist
+    (area * unclip_ratio / dist,area,dist)
 }
 
 fn clip(img: &DynamicImage, rect: &[Point<f64>; 4], max_degree: f64) -> DynamicImage {

@@ -10,7 +10,9 @@ anyhow = {version = "1.0.72",features = ["backtrace"]}
 derivative = "2.2.0"
 image = "0.24.6"
 imageproc = "0.23.0"
-ncnn-rs = {path = '/persist/chez/data/github/rust-ncnn-build/ncnn-rs',features = ["static","vulkan-static-glslang"]}
+itertools = "0.11.0"
+#ncnn-rs = {path = '/persist/chez/data/github/rust-ncnn-build/ncnn-rs',features = ["static","vulkan-static-glslang"]}
+ncnn-rs = {version = "0.1",features = ["static","vulkan-static-glslang"]}
 num-integer = "0.1.45"
 num-traits = "0.2.16"
 rust-embed = "6.8.1"

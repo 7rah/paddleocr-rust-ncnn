@@ -2,7 +2,6 @@ use anyhow::{Context, Result};
 use image::{self, DynamicImage, GenericImageView, ImageBuffer, Luma};
 use ncnn_rs::{Mat, Net};
 
-// 写一个宏统计时间，用大括号 {} 包围调试的语句，打印出语句执行的时间和行号
 #[macro_use]
 macro_rules! timeit {
     ($($arg:tt)*) => {{
@@ -30,7 +29,10 @@ pub trait MatToSlice {
 impl MatToSlice for Mat {
     fn to_slice<T>(&self) -> &[T] {
         unsafe {
-            core::slice::from_raw_parts(self.data() as *const T, (self.w() * self.h()) as usize)
+            core::slice::from_raw_parts(
+                self.data() as *const T,
+                (self.w() * self.h() * self.c() * self.d()) as usize,
+            )
         }
     }
 
