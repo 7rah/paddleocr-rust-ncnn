@@ -6,7 +6,7 @@ CPU 推理大约耗时 20s。而 ncnn 是一个轻量，高性能的神经网络
 推理流程，项目无 opencv 依赖，除了 ncnn 外，其余的依赖都能比较容易地跨平台。
 
 # 编译运行
-参考 (rust-ncnn)[https://github.com/tpoisonooo/rust-ncnn] 配置环境，环境配置好后（能编译 rust-ncnn），直接运行下面代码即可
+参考 [rust-ncnn](https://github.com/tpoisonooo/rust-ncnn) 配置环境，环境配置好后（能编译 rust-ncnn），直接运行下面代码即可
 
 ```
 cargo run --release
